@@ -1,0 +1,28 @@
+--- 
+title: "Knitting Example"
+author: "Hung Jui Chao"
+date: "09-17-2026"
+output: html_document
+---
+
+# Heading (one hash)
+## Heading 2 (two hashes)
+### Sub heading 3 (three hashes)
+#### Sub heading 2 (four hashes)
+##### Bold text (5 hashes)
+###### Bold text 2 (6 hashes)
+###### END
+
+```{r}
+air <- AirPassengers
+air
+# Hashes inside the r code are treated as comments and will be greyed out in the output
+# In this code we have loaded the AirPassengers data
+```
+
+* Typing this way will give a bullet point in out output knitted file
+
+```{r}
+plot(air, main = "Air Passengers Plot")
+```
+
