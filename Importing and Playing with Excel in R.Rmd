@@ -1,0 +1,62 @@
+---
+title: "Importing and Playing with Excel in R"
+author: "Hung Jui Chao"
+date: "09-17-2026"
+output: html_document
+---
+  
+```{r}
+data <- read.csv("Typical_Employee_Survey_Data.csv")
+```
+
+## Question 1: Print out the 5-point summary and boxplot (numerical columns) for each column
+```{r}
+summary(data)
+boxplot(data$A1)
+boxplot(data$A2)
+boxplot(data$A3)
+boxplot(data$A4)
+boxplot(data$A5)
+boxplot(data$A6)
+boxplot(data$A7)
+boxplot(data$A8)
+boxplot(data$A9)
+boxplot(data$A10)
+boxplot(data$A11)
+```
+### Question 2: Convert the columns that need to be converted to Factors 
+```{r}
+str(data)
+data$A2 <- as.factor(data$A2)
+data$A3 <- as.factor(data$A3)
+data$A4 <- as.factor(data$A4)
+data$A6 <- as.factor(data$A6)
+data$A7 <- as.factor(data$A7)
+data$A8 <- as.factor(data$A8)
+data$A9 <- as.factor(data$A9)
+data$A10 <- as.factor(data$A10)
+data$A11 <- as.factor(data$A11)
+```
+## Question 3: Plot the right visual for each column
+```{r}
+hist(data$A1, main = "A1", xlab = "A1")
+barplot(table(data$A2), main = "A2", xlab = "A2")
+barplot(table(data$A3), main = "A3", xlab = "A3")
+barplot(table(data$A4), main = "A4", xlab = "A4")
+hist(data$A5, main = "A5", xlab = "A5")
+barplot(table(data$A6), main = "A6", xlab = "A6")
+barplot(table(data$A7), main = "A7", xlab = "A7")
+barplot(table(data$A8), main = "A8", xlab = "A8")
+barplot(table(data$A9), main = "A9", xlab = "A9")
+barplot(table(data$A10), main = "A10", xlab = "A10")
+barplot(table(data$A11), main = "A11", xlab = "A11")
+```
+## Question 4: Plot scatter plots to show a few relationships
+```{r}
+plot(data$A1, data$A5, main = "Relationship between A1 & A5", xlab = "A1", ylab = "A5")
+plot(data$A1, data$A2, main = "Relationship between A1 & A2", xlab = "A1", ylab = "A2")
+plot(data$A5, data$A11, main = "Relationship between A5 & A11", xlab = "A5", ylab = "A11")
+plot(data$A3, data$A4, main = "Relationship between A3 & A4", xlab = "A3", ylab = "A4")
+```
+
+
