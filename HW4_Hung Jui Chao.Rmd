@@ -1,0 +1,193 @@
+---
+title: "HW4 - Hung Jui Chao"
+author: "Hung Jui Chao"
+date: "2026-10-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+# Try the different models ran in class on my dataset.
+
+## Install Packages
+```{r}
+#install.packages("readxl")
+#install.packages("forecast")
+
+library(readxl)
+library(forecast)
+```
+
+## Read Excel File
+```{r}
+NJ <- read_excel("NJ_Unemployment_Rate_5Y.xlsx",
+                 sheet = "NJ Unemployment Data")
+
+head(NJ)
+```
+
+## Create Monthly Time Series
+```{r}
+NJ_ts <- ts(NJ$NJ_Unemployment_Rate, start = c(2020,9), frequency = 12)
+NJ_ts
+```
+## See the ACF
+```{r}
+Acf(NJ_ts)
+```
+
+### ACF explain: The ACF plot shows strong positive autocorrelation at the first several lags, indicating that the New Jersey unemployment rate is highly related to its recent historical values. The autocorrelation gradually decreases as the lag increases, suggesting that more recent observations have a stronger relationship with the current unemployment rate than older observations. It also shows a slow deay, indicating strong persistence and suggesting trend or non-stationary behavior in the time series.
+
+## Model 1 Naive:
+```{r}
+fc_nv <- naive(NJ_ts, h = 12)
+fc_nv
+```
+## See the attribute
+```{r}
+attributes(fc_nv)
+```
+### Explain: Naive model assume that future unemployment rate will be the same as e most recent observed so the forecast remain as 5.5 as the latest observation.
+
+## Model 2: Season Naive:
+```{r}
+snaive_fc <- snaive(NJ_ts, h = 12)
+snaive_fc
+```
+### Explain: The Seasonal Naive model uses the unemployment rate from the same month of the previous year as the forecast. Since the data are monthly with a frequency of 12, each forecast is based on the corresponding observation from 12 months earlier. This method works well when a time series has a strong and stable annual seasonal pattern.
+
+## Model 3: Moving Average(3, 5, 9)
+```{r}
+MA3 <- ma(NJ_ts, order = 3)
+MA5 <- ma(NJ_ts, order = 5)
+MA9 <- ma(NJ_ts, order = 9)
+
+plot(NJ_ts)
+lines(MA3, col = "blue")
+lines(MA5, col = "red")
+lines(MA9, col = "green")
+
+ma3_fc = tail(NJ_ts, 3)
+ma5_fc = tail(NJ_ts, 5)
+ma9_fc = tail(NJ_ts, 9)
+
+MA3_FCST = ts(rep(ma3_fc, 12),
+                   start = c(2025, 9),
+                   frequency = 12)
+MA5_FCST = ts(rep(ma5_fc, 12),
+                   start = c(2025, 9),
+                   frequency = 12)
+
+MA9_FCST = ts(rep(ma9_fc, 12),
+                   start = c(2025, 9),
+                   frequency = 12)
+
+```
+### Explain: The Moving Average method smooths shorterm-fluctuation by averaging the most recent observation. If unemployment rate has spike or drop, MA method will have lagging effect, larger average range will be more stable so that response more slowly to the change.
+
+## Model 4: Decomposition:
+```{r}
+ets_model <- ets(NJ_ts)
+ets_fc = forecast(ets_model, h = 12)
+plot(ets_fc)
+
+```
+### Explain: ETS uses exponential smoothing and automatically determines an appropriate combination of error, trend, and seasonal components based on the historical data. Compared with the simpler models, ETS can respond more effectively to changes in the underlying level and trend of the unemployment rate.
+
+
+## Model 5: Simple Exponential smoothing
+```{r}
+model_es <- HoltWinters(NJ_ts, beta = FALSE, gamma = FALSE)
+model_es
+
+fc_es <- forecast(model_es, h = 12)
+fc_es
+```
+### Explain: Simple Expoential Smoothing gives more weight to recent observation while still incorporating with historical data. According to the alpha provided by R, this es will be more responsive since it gives over 99% weight on recent observation. If there is continuous upward or downward, ES might not able to capture the fluctuation since simple es only consider Level but no Trend and Seasonality.
+
+
+## Model 6: HoltWinters (Trend + Level + Seasonality)
+```{r}
+model_hw <- HoltWinters(NJ_ts)
+model_hw
+
+fc_hw <- forecast(model_hw, h = 12)
+fc_hw
+```
+### Explain: HoltWinters is more flexible because it also consider Trend and Seasonality into Forecast. Therefore, if there is trend or seasonality in the data, HoltWinters will be more reliable to capture those information. However, it doesn't mean that HoltWinters is more accurate model, it still needs to see the accuracy.
+
+# Plot the time series and different model forecasts in one chart
+```{r}
+plot(NJ_ts,
+     xlim = c(2020.7, 2026.7),
+     main = "NJ Unemployment Rate and Forecasts",
+     xlab = "Year",
+     ylab = "Unemployment Rate (%)",
+     col = "black",
+     lwd = 2)
+
+# Forecasts
+lines(fc_nv$mean, col = "blue", lwd = 2, lty = 1)
+lines(snaive_fc$mean, col = "red", lwd = 2, lty = 2)
+
+lines(MA3_FCST, col = "yellow", lwd = 2, lty = 3)
+lines(MA5_FCST, col = "green", lwd = 2, lty = 4)
+lines(MA9_FCST, col = "grey", lwd = 2, lty = 5)
+
+lines(ets_fc$mean, col = "orange", lwd = 2, lty = 6)
+lines(fc_es$mean, col = "navy", lwd = 2, lty = 7)
+lines(fc_hw$mean, col = "pink", lwd = 2, lty = 8)
+
+legend("bottomleft",
+       legend = c("Actual", "Naive", "SNaive",
+                  "MA3", "MA5", "MA9",
+                  "ETS", "Simple ES", "Holt-Winters"),
+       col = c("black", "blue", "red",
+               "yellow", "green", "grey",
+               "orange", "navy", "pink"),
+       lty = 1,
+       lwd = 2,
+       cex = 0.65, 
+      )
+```
+
+### From the chart, we can tell that Naive and Simple ES have the same FCST for 5.5, the same as the latest observation. This is due to Naive take the latest observation as its next FCST, and Simple ES put large weight on latest observation for over 99% so that the result come out will be approximated match the Naive model.
+
+# Pick an accuracy measure, compare your models, and state the best model based on the accuracy comparison
+## I pick RMSE as my accuracy measure and the result show as below
+```{r}
+accuracy(fc_nv)
+accuracy(snaive_fc)
+RMSE_MA3 = sqrt(mean((NJ_ts - MA3)^2, na.rm = TRUE))
+RMSE_MA5 = sqrt(mean((NJ_ts - MA5)^2, na.rm = TRUE))
+RMSE_MA9 = sqrt(mean((NJ_ts - MA9)^2, na.rm = TRUE))
+RMSE_MA3
+RMSE_MA5
+RMSE_MA9
+accuracy(ets_fc)
+accuracy(fc_es)
+accuracy(fc_hw)
+```
+### I selected RMSE as the accuracy measure to compare the models. RMSE means the difference between the actual values and the fitted values in the same unit as the original data. It also gives the greater weight to larger errors. A lower RMSE indicates better model accuracy. Based on the result above, MA3 has the lowest RMSE so that I will say Moving Average with 3 month basis privdes the best fit among the models evaluated.
