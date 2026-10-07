@@ -1,0 +1,132 @@
+---
+title: "HW5_Decomposition_Hung Jui Chao"
+author: "Hung Jui Chao"
+date: "2026-10-07"
+output: html_document
+---
+
+# Decomposition 
+
+## Install Package
+```{r}
+library(readxl)
+library(forecast)
+```
+
+## Read Excel
+```{r}
+NJ <- read_excel("NJ_Unemployment_Rate_5Y.xlsx",
+                 sheet = "NJ Unemployment Data")
+
+head(NJ)
+```
+
+## Create monthly time series Data
+```{r}
+NJ_ts <- ts(NJ$NJ_Unemployment_Rate, start = c(2020,9), frequency = 12)
+NJ_ts
+```
+
+## Plot Time series
+```{r}
+plot(NJ_ts)
+```
+
+## Use Stl and Plot
+```{r}
+stl_decomp_NJ <- stl(NJ_ts,s.window ="periodic")
+plot(stl_decomp_NJ)
+```
+
+### Explain: The STL decomposition shows a clear trend in NJ unemployment rate. The unemployment rate decreased from 2021 to around 2022-2023 and then gradually increased afterward. A recurring seasonality pattern is also presented but its magnitutude is relatively small compared to overall trend which only range from -0.05 to 0.05. The remainder fluctuates around zero, representing irregular variations that cannot be explained by the trend and seasonality.
+
+## See the attribute
+```{r}
+attributes(stl_decomp_NJ)
+```
+
+## Do the seasonal adjustment
+```{r}
+seas_stl_decomp_NJ <- seasadj(stl_decomp_NJ) ## remove seasonal effect
+seas_stl_decomp_NJ
+```
+
+## Plot
+```{r}
+plot(NJ_ts)
+lines(seas_stl_decomp_NJ, col = "red")
+```
+
+### Explain: We can tell from the chart that seasonal effect to the NJ unemployment rate is relatively small since the line of NJ unemployment rate without seasonal effect is almost matched to the orginal data. This also show in the graph of stl_decomp_NJ that seasonality is relatively small compared to the overall trend which only range from -0.05 to 0.05.
+
+## Do the forecast for next year NJ unemployment rate
+```{r}
+fc_stl_NJ <- forecast(stl_decomp_NJ, h = 12)
+fc_stl_NJ
+```
+
+## Plot the forecast 
+```{r}
+plot(fc_stl_NJ)
+```
+
+### Explain: ETS(A,Ad,N) forecasts the future one year series using an additive error and damped trend. A means additive Error, Ad means Additive Dampend Trend, and N means No Seansonality in the ETS component. 
+
+## Use other option to do the decomposition: decompose()
+```{r}
+decomp_NJ <- decompose(NJ_ts)
+decomp_NJ
+```
+
+## See the attributes
+```{r}
+attributes(decomp_NJ)
+```
+
+## Remove Seasonal from decomp_NJ
+```{r}
+seasadj_decomp_NJ = seasadj(decomp_NJ)
+seasadj_decomp_NJ
+```
+
+### Explain: We can see from the result the seasonal effect has been removed. Take Jun 2021 for example, original data is 7.4 with trend:NA, seasonality: 0.0462673611, random: NA. The data after remove seasonal effect is 7.353733 which equals to 7.4 minus 0.0462673611. 
+
+## Plot 
+```{r}
+plot(NJ_ts)
+lines(seasadj_decomp_NJ, col = "red")
+```
+
+### Explain: same as previous show that seasonality do small in the data so there is no significant effect when we remove the seasonal effect. 
+
+## Do the forecast for data remove seasonal effect
+```{r}
+fc_seas_NJ = forecast(seasadj_decomp_NJ, h = 12) ## forecast next year without seasonal effect
+fc_seas_NJ
+```
+
+## Plot the forecast
+```{r}
+plot(fc_seas_NJ)
+```
+
+### Explain: We can see from the chart that the forecast is relatively smooth compared to previous chart since we have remove the seasonal effect from the data.
+
+## Plot the decomp_NJ and its forecast
+```{r}
+plot(decomp_NJ$x)
+plot(forecast(decomp_NJ$x))
+```
+
+### Explain: forecast looks the same as the latest observation is because we use the data without trend, seasonality, and random. 
+
+## See the accuracy with other model
+```{r}
+accuracy(fc_seas_NJ)
+HW_NJ = HoltWinters((NJ_ts))
+accuracy(forecast(HW_NJ))
+ETS_NJ = ets(NJ_ts)
+accuracy(forecast(ETS_NJ))
+```
+
+### Explain: We can tell from the RMSE numbers that the forecast of removing seasonal effect from data is the best fitted model since the number is the lowest. 
