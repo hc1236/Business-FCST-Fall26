@@ -1,0 +1,689 @@
+---
+title: "Final Project"
+author: "Hung Jui Chao"
+date: "2026-11-08"
+output: html_document
+---
+```{r}
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(forecast)
+library(tseries)
+library(lubridate)
+```
+
+```{r}
+# Import Excel file
+wsts <- read_excel("BF Final project data.xlsx", sheet = 1)
+
+# Convert Date column
+wsts$Date <- as.Date(wsts$Date)
+
+# Check data
+head(wsts)
+
+# Check structure
+str(wsts)
+
+# Check column names
+names(wsts)
+```
+
+```{r}
+# set up Data
+
+wsts_long <- wsts %>%
+  select(Date, Americas, Europe, Japan,
+         `Asia Pacific`, Worldwide) %>%
+  pivot_longer(
+    cols = -Date,
+    names_to = "Region",
+    values_to = "Sales"
+  ) %>%
+  mutate(
+    Sales_Billion = Sales / 1000000,
+    Region = factor(
+      Region,
+      levels = c("Worldwide", "Americas",
+                 "Europe", "Japan", "Asia Pacific")
+    )
+  )
+
+head(wsts_long)
+```
+
+```{r}
+ggplot(wsts_long,
+       aes(x = Date, y = Sales_Billion,
+           color = Region)) +
+  geom_line(linewidth = 1) +
+
+  # Mark growth acceleration
+  geom_vline(
+    xintercept = as.Date("2025-09-01"),
+    color = "red",
+    linetype = "dashed",
+    linewidth = 1
+  ) +
+
+  annotate(
+    "label",
+    x = as.Date("2024-12-01"),
+    y = 165,
+    label = "Growth Acceleration\nSep 2025",
+    color = "red",
+    size = 4
+  ) +
+
+  scale_color_manual(
+    values = c(
+      "Worldwide" = "black",
+      "Americas" = "purple",
+      "Europe" = "blue",
+      "Japan" = "green",
+      "Asia Pacific" = "orange"
+    )
+  ) +
+
+  scale_x_date(
+    date_breaks = "1 year",
+    date_labels = "%Y"
+  ) +
+
+  labs(
+    title = "Monthly Semiconductor Sales by Region",
+    subtitle = "January 2016 - August 2026",
+    x = "Year",
+    y = "Sales (Billion USD)",
+    color = "Region",
+    caption = "Source: WSTS Historical Billings Report"
+  ) +
+
+  theme_minimal(base_size = 13) +
+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold")
+  )
+```
+
+```{r}
+ggplot(wsts_growth,
+       aes(x = Date, y = YoY_Growth)) +
+  geom_line(color = "purple", linewidth = 1) +
+
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed",
+    color = "gray50"
+  ) +
+
+  # Mark growth acceleration
+  geom_vline(
+    xintercept = as.Date("2025-09-01"),
+    color = "red",
+    linetype = "dashed",
+    linewidth = 1
+  ) +
+
+  annotate(
+    "label",
+    x = as.Date("2024-03-01"),
+    y = 150,
+    label = "Growth Acceleration\nSep 2025",
+    color = "red",
+    size = 3.5
+  ) +
+
+  labs(
+    title = "Global Semiconductor Sales YoY Growth",
+    subtitle = "January 2016 - August 2026",
+    x = "Year",
+    y = "YoY Growth (%)",
+    caption = "Source: WSTS Historical Billings Report"
+  ) +
+
+  theme_minimal(base_size = 13)
+```
+
+```{r}
+library(forecast)
+
+# Create monthly time series
+sales_ts <- ts(
+  wsts$Worldwide / 1000000,
+  start = c(2016, 1),
+  frequency = 12
+)
+
+# Check time series
+start(sales_ts)
+end(sales_ts)
+frequency(sales_ts)
+```
+
+```{r}
+acf(
+  sales_ts,
+  lag.max = 36,
+  main = "ACF of Global Semiconductor Sales"
+)
+```
+
+```{r}
+# Additive Decomposition
+plot(decompose(sales_ts, type = "additive"))
+
+# Multiplicative Decomposition
+plot(decompose(sales_ts, type = "multiplicative"))
+```
+
+# Naive Model
+```{r}
+# Naive Forecast
+naive_model <- naive(sales_ts, h = 12)
+
+# summary
+summary(naive_model)
+
+# Plot
+plot(naive_model,
+     main = "Naive Forecast - Global Semiconductor Sales",
+     xlab = "Year",
+     ylab = "Sales (Billion USD)",
+     col = "blue")
+
+
+```
+
+#Naive Residual
+```{r}
+# Residuals
+naive_res <- residuals(naive_model)
+
+# Plot residuals
+plot(naive_res,
+     main = "Naive Method - Residual Plot",
+     xlab = "Year",
+     ylab = "Residuals",
+     col = "blue",
+     lwd = 1)
+
+abline(h = 0, col = "red", lty = 2)
+```
+
+# Histogram of Residual
+```{r}
+hist(naive_res,
+     main = "Naive Method - Histogram of Residuals",
+     xlab = "Residuals",
+     ylab = "Frequency",
+     col = "lightblue",
+     border = "white")
+
+abline(v = 0, col = "red", lty = 2, lwd = 2)
+```
+
+# Fitted Value v.s Residual
+```{r}
+# Fitted Value
+naive_fitted <- fitted(naive_model)
+plot(naive_fitted)
+
+# Fitted Values vs Residuals
+plot(as.numeric(naive_fitted),
+     as.numeric(naive_res),
+     main = "Naive Method - Fitted vs Residuals",
+     xlab = "Fitted Values",
+     ylab = "Residuals",
+     col = "blue",
+     pch = 19)
+
+# Reference line
+abline(h = 0, col = "red", lty = 2)
+```
+
+#Actual vs Residual
+```{r}
+naive_actual <- as.numeric(sales_ts)
+naive_res <- as.numeric(residuals(naive_model))
+
+plot(naive_actual, naive_res,
+     main = "Naive Method - Actual vs Residuals",
+     xlab = "Actual Values",
+     ylab = "Residuals",
+     col = "blue",
+     pch = 19)
+
+abline(h = 0, col = "red", lty = 2)
+```
+
+# ACF
+```{r}
+# Since first month has no previous observation, there will be NA in the data list. We need to remove the NA and do the ACF, using no.omit
+
+acf(na.omit(naive_res),
+    lag.max = 36, 
+    main = "Naive Method - ACF of Residuals")
+
+```
+
+# Moving Average
+```{r}
+mavg3_forecast = ma(sales_ts,order=3)
+mavg6_forecast = ma(sales_ts,order=6)
+mavg9_forecast = ma(sales_ts,order=9) 
+plot(sales_ts, main = "Plot along with moving averages")
+lines(mavg3_forecast, col="Red")
+lines(mavg6_forecast, col="Blue")
+lines(mavg9_forecast, col="Green")
+
+legend("topleft",
+       legend = c("Actual Sales", "MA3", "MA6", "MA9"),
+       col = c("black", "red", "blue", "green"),
+       lty = 1,
+       lwd = 2,
+       bty = "n")
+```
+
+```{r}
+MA3_forecast <- forecast(mavg3_forecast, h = 12)
+summary(MA3_forecast)
+plot(MA3_forecast)
+```
+
+# Residual of MA3 Analysis
+```{r}
+# Residuals
+MA3_res <- residuals(MA3_forecast)
+
+# Plot residuals
+plot(MA3_res,
+     main = "MA3 - Residual Plot",
+     xlab = "Year",
+     ylab = "Residuals",
+     col = "blue",
+     lwd = 1)
+
+abline(h = 0, col = "red", lty = 2)
+```
+
+# Histogram of Residual
+```{r}
+hist(MA3_res,
+     main = "MA3 - Histogram of Residuals",
+     xlab = "Residuals",
+     ylab = "Frequency",
+     col = "lightblue",
+     border = "white")
+
+abline(v = 0, col = "red", lty = 2, lwd = 2)
+```
+
+# Fitted Value v.s Residual
+```{r}
+# Fitted Value
+MA3_fitted <- fitted(MA3_forecast)
+plot(MA3_fitted)
+
+# Fitted Values vs Residuals
+plot(as.numeric(MA3_fitted),
+     as.numeric(MA3_res),
+     main = "MA3 - Fitted vs Residuals",
+     xlab = "Fitted Values",
+     ylab = "Residuals",
+     col = "blue",
+     pch = 19)
+
+# Reference line
+abline(h = 0, col = "red", lty = 2)
+```
+
+# Actual v.s Residual
+```{r}
+MA3_actual <- as.numeric(sales_ts)
+
+plot(MA3_actual, MA3_res,
+     main = "MA3 - Actual vs Residuals",
+     xlab = "Actual Values",
+     ylab = "Residuals",
+     col = "blue",
+     pch = 19)
+
+abline(h = 0, col = "red", lty = 2)
+```
+
+# ACF of Residual
+```{r}
+acf(as.numeric(na.omit(MA3_res)),
+    lag.max = 36,
+    main = "MA3 - ACF of Residuals",
+    xlab = "Lag (Months)")
+```
+
+
+
+
+# Simple Exponential Smooth
+```{r}
+# Simple Exponential Smoothing: Forecast next 12 months
+ses_model <- ses(sales_ts, h = 12)
+
+# Show model output
+summary(ses_model)
+
+# Plot forecast
+plot(ses_model,
+     main = "SES Forecast - Global Semiconductor Sales",
+     xlab = "Year",
+     ylab = "Sales (Billion USD)",
+     col = "blue")
+```
+
+# SES Residual
+```{r}
+# Residuals
+ses_res <- residuals(ses_model)
+
+# Plot residuals
+plot(ses_res,
+     main = "SES - Residual Plot",
+     xlab = "Year",
+     ylab = "Residuals",
+     col = "blue",
+     lwd = 1)
+
+abline(h = 0, col = "red", lty = 2)
+```
+
+# Histogram of SES Residual
+```{r}
+hist(ses_res,
+     main = "SES - Histogram of Residuals",
+     xlab = "Residuals",
+     ylab = "Frequency",
+     col = "lightblue",
+     border = "white")
+
+abline(v = 0, col = "red", lty = 2, lwd = 2)
+```
+
+# Fitted Value v.s Residual
+```{r}
+# Fitted Value
+ses_fitted <- fitted(ses_model)
+plot(ses_fitted)
+
+# Fitted Values vs Residuals
+plot(as.numeric(ses_fitted),
+     as.numeric(ses_res),
+     main = "SES - Fitted vs Residuals",
+     xlab = "Fitted Values",
+     ylab = "Residuals",
+     col = "blue",
+     pch = 19)
+
+# Reference line
+abline(h = 0, col = "red", lty = 2)
+```
+
+# Actual v.s Residual
+```{r}
+ses_actual <- as.numeric(sales_ts)
+
+plot(ses_actual, ses_res,
+     main = "SES - Actual vs Residuals",
+     xlab = "Actual Values",
+     ylab = "Residuals",
+     col = "blue",
+     pch = 19)
+
+abline(h = 0, col = "red", lty = 2)
+```
+
+# ACF of Residual
+```{r}
+acf(as.numeric(na.omit(ses_res)),
+    lag.max = 36,
+    main = "SES - ACF of Residuals",
+    xlab = "Lag (Months)")
+```
+
+# Holt Model
+```{r}
+# Holt's Linear Trend Forecast
+holt_model <- holt(sales_ts, h = 12)
+
+# Show model output
+summary(holt_model)
+
+# Plot forecast
+plot(holt_model,
+     main = "Holt Forecast - Global Semiconductor Sales",
+     xlab = "Year",
+     ylab = "Sales (Billion USD)",
+     col = "blue")
+```
+
+
+# Residual of Holt
+```{r}
+# Residuals
+holt_res <- residuals(holt_model)
+
+# Plot residuals
+plot(holt_res,
+     main = "Holt - Residual Plot",
+     xlab = "Year",
+     ylab = "Residuals",
+     col = "blue",
+     lwd = 1)
+
+abline(h = 0, col = "red", lty = 2)
+```
+
+# Histogram of Residual
+```{r}
+hist(holt_res,
+     main = "Holt - Histogram of Residuals",
+     xlab = "Residuals",
+     ylab = "Frequency",
+     col = "lightblue",
+     border = "white")
+
+abline(v = 0, col = "red", lty = 2, lwd = 2)
+```
+
+# Fitted v.s Residual
+```{r}
+# Fitted Value
+holt_fitted <- fitted(holt_model)
+plot(holt_fitted)
+
+# Fitted Values vs Residuals
+plot(as.numeric(holt_fitted),
+     as.numeric(holt_res),
+     main = "Holt - Fitted vs Residuals",
+     xlab = "Fitted Values",
+     ylab = "Residuals",
+     col = "blue",
+     pch = 19)
+
+# Reference line
+abline(h = 0, col = "red", lty = 2)
+```
+
+# Actual v.s Residual
+```{r}
+holt_actual <- as.numeric(sales_ts)
+
+plot(holt_actual, holt_res,
+     main = "Holt - Actual vs Residuals",
+     xlab = "Actual Values",
+     ylab = "Residuals",
+     col = "blue",
+     pch = 19)
+
+abline(h = 0, col = "red", lty = 2)
+```
+
+# ACF of Residual
+```{r}
+acf(as.numeric(na.omit(holt_res)),
+    lag.max = 36,
+    main = "Holt - ACF of Residuals",
+    xlab = "Lag (Months)")
+```
+
+# Holt Winters
+```{r}
+# Holt-Winters Multiplicative Forecast: Next 12 Months
+hw_model <- hw(sales_ts,
+               seasonal = "multiplicative",
+               h = 12)
+
+# Show model output
+summary(hw_model)
+
+# Plot forecast
+plot(hw_model,
+     main = "Holt-Winters Forecast - Global Semiconductor Sales",
+     xlab = "Year",
+     ylab = "Sales (Billion USD)",
+     col = "blue")
+
+```
+
+
+# Holt-Winters Residual
+```{r}
+# Residuals
+hw_res <- residuals(hw_model)
+
+# Plot residuals
+plot(hw_res,
+     main = "Holt-Winters - Residual Plot",
+     xlab = "Year",
+     ylab = "Residuals",
+     col = "blue",
+     lwd = 1)
+
+abline(h = 0, col = "red", lty = 2)
+```
+
+# Histogram of Residual
+```{r}
+hist(hw_res,
+     main = "Holt-Winters - Histogram of Residuals",
+     xlab = "Residuals",
+     ylab = "Frequency",
+     col = "lightblue",
+     border = "white")
+
+abline(v = 0, col = "red", lty = 2, lwd = 2)
+```
+
+# Fitted v.s Residual
+```{r}
+# Fitted Value
+hw_fitted <- fitted(hw_model)
+plot(hw_fitted)
+
+# Fitted Values vs Residuals
+plot(as.numeric(hw_fitted),
+     as.numeric(hw_res),
+     main = "Holt-Winters - Fitted vs Residuals",
+     xlab = "Fitted Values",
+     ylab = "Residuals",
+     col = "blue",
+     pch = 19)
+
+# Reference line
+abline(h = 0, col = "red", lty = 2)
+```
+
+# Actual v.s Residual
+```{r}
+hw_actual <- as.numeric(sales_ts)
+
+plot(holt_actual, hw_res,
+     main = "Holt-Winters - Actual vs Residuals",
+     xlab = "Actual Values",
+     ylab = "Residuals",
+     col = "blue",
+     pch = 19)
+
+abline(h = 0, col = "red", lty = 2)
+```
+
+# ACF of Residual
+```{r}
+acf(as.numeric(na.omit(hw_res)),
+    lag.max = 36,
+    main = "Holt-Winters - ACF of Residuals",
+    xlab = "Lag (Months)")
+```
+
+
+# ARIMA model
+```{r}
+# Check differencing
+ndiffs(sales_ts)
+
+#Check seasonal differencing
+nsdiffs(sales_ts)
+```
+
+```{r}
+tsdisplay(sales_ts)
+tsdisplay(diff(sales_ts, diffferences = 2))
+```
+
+# ARIMA Forecast
+```{r}
+auto_fit_sales = auto.arima(sales_ts, trace=TRUE, stepwise = FALSE)
+auto_fit_sales
+```
+
+```{r}
+plot(forecast(auto_fit_sales, h = 12, level=c(99.5)))
+```
+
+# Summary of ARIMA
+```{r}
+summary(forecast(auto_fit_sales, h = 12, level=c(99.5)))
+```
+
+# Residual Analysis of ARIMA
+```{r}
+#ACF
+Acf(auto_fit_sales$residuals)
+```
+
+# Histogram of Residual
+```{r}
+hist(auto_fit_sales$residuals)
+abline(v = 0, col = "red", lty = 2, lwd = 2)
+```
+
+
+# Box test - Ljung
+```{r}
+Box.test(residuals(auto_fit_sales),
+         lag = 20,
+         type = "Ljung-Box",
+         fitdf = 4)V
+```
+
+```{r}
+plot.ts(residuals(auto_fit_sales), main = "ARIMA - Residual plot")
+abline(h = 0, col = "red", lty = 2, lwd = 2)
+```
+
+```{r}
+tsdiag(auto_fit_sales)
+```
+
